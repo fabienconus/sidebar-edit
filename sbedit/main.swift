@@ -11,11 +11,13 @@
 import Foundation
 import AppKit
 
+let version = "1.0"
+
 enum MyError: Error {
     case inputOutputError(String)
     case pathError(String)
     case structureError(String)
-    case bookmarkError(String)
+    case bookmarkError(String )
 }
 
 func main() {
@@ -55,6 +57,9 @@ func main() {
             logerror(error.localizedDescription)
             exit(1)
         }
+    case "--version":
+        print(version)
+        exit(0)
     default:
         usage()
         exit(1)
@@ -67,21 +72,22 @@ sbedit: a tool to manipulate the Finder sidebar
   usage: sbedit command [arguments]
 
     LIST OF POSSIBLE COMMANDS :
-         --add:          add all the paths provided as arguments to the sidebar
-         --removeAll:    remove all items from the sidebar
-         --remove:       remove the item path provided as argument from the 
+         --add           add all the paths provided as arguments to the sidebar
+         --removeAll     remove all items from the sidebar
+         --remove        remove the item path provided as argument from the 
                          sidebar
-         --list:         display the list of paths currently in the sidebar
-         --reload:       reloads the Finder sidebar. This command takes an 
+         --list          display the list of paths currently in the sidebar
+         --reload        reloads the Finder sidebar. This command takes an 
                          optional argument "--force". See discussion below.
+         --version       prints the version number
          
     RELOADING THE FINDER SIDEBAR
     
     Reloading the Finder Sidebar is done by restarting the sharedfilelistd 
     daemon. However, the changes to the Finder sidebar can take up to a minute 
-    to be visible. To speed up the reloading process, you can provide the --force 
-    argument, which will kill and restart the Finder, thus making the changes 
-    immediately visible.
+    to be visible. To speed up the reloading process, you can provide the 
+    --force argument, which will kill and restart the Finder, thus making 
+    the changes immediately visible.
 """
     print(usage)
 }
