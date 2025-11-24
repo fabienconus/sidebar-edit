@@ -2,10 +2,10 @@
 // by acting on the com.apple.LSSharedFileList.FavoriteItems.sfl3 file
 //
 // Works with macOS 14 and later (for the SFL3 file format)
-// 
+//
 // Inspired by the AppleScript by com.cocolog-nifty.quicktimer
 // https://quicktimer.cocolog-nifty.com/icefloe/2024/03/post-7f4cb0.html
-// 
+//
 // Fabien Conus, 11.11.2025
 
 import Foundation
@@ -13,20 +13,23 @@ import AppKit
 
 let version = "1.0"
 
+// Custom error types for different failure scenarios
 enum MyError: Error {
-    case inputOutputError(String)
-    case pathError(String)
-    case structureError(String)
-    case bookmarkError(String )
+    case inputOutputError(String)  // File read/write errors
+    case pathError(String)          // Invalid or problematic paths
+    case structureError(String)     // Malformed SFL3 file structure
+    case bookmarkError(String)      // Bookmark creation failures
 }
 
 func main() {
-    // Initialize the path to the SFL3 file
+    // Initialize the path to the SFL3 file (Finder's sidebar data file)
     guard let sharedFileListURL = try? getSFL3path() else
     {
         logerror("Unable to get URL for the SFL3 file")
         exit(1)
     }
+    
+    // Create an empty SFL3 file if it doesn't exist
     if !FileManager.default.fileExists(atPath: sharedFileListURL.path) {
         createEmptySFL3(to: sharedFileListURL)
     }
@@ -34,17 +37,20 @@ func main() {
     // First argument is always the path to the binary, drop it.
     let arguments = CommandLine.arguments.dropFirst()
     
-    // Retrieve the comman
+    // Retrieve the command from the first argument
     let command = arguments.first
     
+    // Route to appropriate handler based on the command
     switch command {
     case "--add":
+        // Extract all paths after the command and add them to sidebar
         let itemPaths = Array(arguments.dropFirst())
         add(items: itemPaths, to:sharedFileListURL)
     case "--removeAll":
         print("Removing all items from the sidebar")
         removeAll(from: sharedFileListURL)
     case "--reload":
+        // Check if force flag is present to kill Finder for immediate refresh
         let force = arguments.contains(where: { $0 == "--force" })
         reloadServices(force: force)
     case "--list":
@@ -92,7 +98,7 @@ sbedit: a tool to manipulate the Finder sidebar
     print(usage)
 }
 
-// allows easy printing to stdErr
+// Extension to allow printing directly to stderr
 // from https://gist.github.com/algal/0a9aa5a4115d86d5cc1de7ea6d06bd91
 extension FileHandle : TextOutputStream {
   public func write(_ string: String) {
@@ -101,27 +107,30 @@ extension FileHandle : TextOutputStream {
   }
 }
 
+// Helper function to print error messages to stderr
 func logerror(_ error : String) {
   var standardError = FileHandle.standardError
   print(error, to:&standardError)
 }
 
 func add(items itemPaths:[String], to sharedFileList:URL) {
+    // Validate that at least one path was provided
     if itemPaths.isEmpty {
         usage()
         exit(1)
     }
     
-    // Open the com.apple.LSSharedFileList.FavoriteItems.sfl3 file
+    // Open and deserialize the SFL3 file
     guard let archiveDictM = try? openSFL3(sharedFileListURL: sharedFileList)
     else {
         logerror("Error reading SFL3 file")
         exit(1)
     }
     
-    // Traiter chaque chemin fourni et suivre les succès
+    // Track if at least one item was successfully added
     var hasSuccess = false
     
+    // Attempt to add each path provided
     for itemPath in itemPaths {
         do {
            try addItem(itemPath: itemPath, to:archiveDictM)
@@ -130,12 +139,13 @@ func add(items itemPaths:[String], to sharedFileList:URL) {
             logerror("Error adding item \(itemPath): \(error)")
         }
     }
-        
+    
+    // Exit with error if no items were successfully added
     if !hasSuccess {
         exit(1)
     }
     
-    // Save the com.apple.LSSharedFileList.FavoriteItems.sfl3 file
+    // Serialize and save the modified SFL3 file
     do {
         try saveSFL3(file: sharedFileList, archiveDictM: archiveDictM)
     } catch {
@@ -145,18 +155,20 @@ func add(items itemPaths:[String], to sharedFileList:URL) {
 }
 
 func removeAll(from sharedFileListURL:URL) {
+    // Open the SFL3 file
     guard let archiveDictM = try? openSFL3(sharedFileListURL: sharedFileListURL)
     else {
         logerror("Error reading SLF3 file")
         exit(1)
     }
     
+    // Create an empty items array to replace all existing items
     let itemsArrayM = NSMutableArray()
     
-    // Updating the main dictionary
+    // Update the main dictionary with the empty array
     archiveDictM.setObject(itemsArrayM, forKey: "items" as NSString)
     
-    // Save the com.apple.LSSharedFileList.FavoriteItems.sfl3 file
+    // Save the modified SFL3 file
     do {
         try saveSFL3(file: sharedFileListURL, archiveDictM: archiveDictM)
     } catch {
@@ -165,6 +177,7 @@ func removeAll(from sharedFileListURL:URL) {
 }
 
 func remove(item itemPath:String, from sharedFileListURL:URL) throws {
+    // Open the SFL3 file
     guard let archiveDictM = try? openSFL3(sharedFileListURL: sharedFileListURL)
     else {
         logerror("Error reading SLF3 file")
@@ -172,7 +185,7 @@ func remove(item itemPath:String, from sharedFileListURL:URL) throws {
     }
     
     // ============================================
-    // Standardizing path
+    // Standardize and validate the path
     // ============================================
     let pathString = (itemPath as NSString).standardizingPath
     guard let addDirURL = URL(fileURLWithPath: pathString).absoluteURL as URL? else {
@@ -180,10 +193,11 @@ func remove(item itemPath:String, from sharedFileListURL:URL) throws {
         throw MyError.pathError("Erreur : chemin invalide - \(itemPath)")
     }
     
+    // Get the absolute URL string for comparison
     let absoluteString = addDirURL.absoluteString
     
     // ============================================
-    // Processing items
+    // Find and remove the matching item
     // ============================================
     guard let itemsArray = archiveDictM.object(forKey: "items") as? NSArray else {
         logerror("Error: unable to read the items array")
@@ -192,26 +206,28 @@ func remove(item itemPath:String, from sharedFileListURL:URL) throws {
     
     let itemsArrayM = NSMutableArray(array: itemsArray)
     
+    // Iterate through all sidebar items
     for item in itemsArrayM {
         guard let itemDict = item as? NSDictionary,
               let bookmarkData = itemDict.object(forKey: "Bookmark") as? Data else {
             continue
         }
         
+        // Resolve the bookmark to get the URL it points to
         var isStale = false
         if let bookmarkURL = try? URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+            // Compare URLs and remove if matched
             if bookmarkURL.absoluteString == absoluteString {
-                // Item was found -> remove it
                 itemsArrayM.remove(item)
                 break
             }
         }
     }
     
-    // Updating the main dictionary
+    // Update the main dictionary with the modified array
     archiveDictM.setObject(itemsArrayM, forKey: "items" as NSString)
     
-    // Save the com.apple.LSSharedFileList.FavoriteItems.sfl3 file
+    // Save the modified SFL3 file
     do {
         try saveSFL3(file: sharedFileListURL, archiveDictM: archiveDictM)
     } catch {
@@ -220,6 +236,7 @@ func remove(item itemPath:String, from sharedFileListURL:URL) throws {
 }
 
 func list(contentof sharedFileListURL:URL) {
+    // Open the SFL3 file
     guard let archiveDictM = try? openSFL3(sharedFileListURL: sharedFileListURL)
     else {
         logerror("Error reading SLF3 file")
@@ -227,22 +244,23 @@ func list(contentof sharedFileListURL:URL) {
     }
         
     // ============================================
-    // Processing items
+    // Extract and display all items
     // ============================================
     guard let itemsArray = archiveDictM.object(forKey: "items") as? NSArray else {
         logerror("Error: unable to read the items array")
         exit(1)
     }
     
+    // Iterate through all sidebar items
     for item in itemsArray {
         guard let itemDict = item as? NSDictionary,
               let bookmarkData = itemDict.object(forKey: "Bookmark") as? Data else {
             continue
         }
         
+        // Resolve the bookmark and print the URL
         var isStale = false
         if let bookmarkURL = try? URL(resolvingBookmarkData: bookmarkData, options: .withoutUI, relativeTo: nil, bookmarkDataIsStale: &isStale) {
-            // Printing the path to the item to the standard output
             print(bookmarkURL.absoluteString)
         }
     }
@@ -250,7 +268,7 @@ func list(contentof sharedFileListURL:URL) {
 
 func addItem(itemPath: String, to archiveDictM:NSMutableDictionary) throws {
     // ============================================
-    // Standardizing path
+    // Standardize and validate the path
     // ============================================
     let pathString = (itemPath as NSString).standardizingPath
     guard let addDirURL = URL(fileURLWithPath: pathString).absoluteURL as URL? else {
@@ -263,7 +281,7 @@ func addItem(itemPath: String, to archiveDictM:NSMutableDictionary) throws {
     
     
     // ============================================
-    // Processing items
+    // Check for duplicate items
     // ============================================
     guard let itemsArray = archiveDictM.object(forKey: "items") as? NSArray else {
         logerror("Error: unable to read the items array")
@@ -272,7 +290,7 @@ func addItem(itemPath: String, to archiveDictM:NSMutableDictionary) throws {
     
     let itemsArrayM = NSMutableArray(array: itemsArray)
     
-    // Checking if the item already exists
+    // Verify the item doesn't already exist in the sidebar
     for item in itemsArrayM {
         guard let itemDict = item as? NSDictionary,
               let bookmarkData = itemDict.object(forKey: "Bookmark") as? Data else {
@@ -289,27 +307,28 @@ func addItem(itemPath: String, to archiveDictM:NSMutableDictionary) throws {
     }
     
     // ============================================
-    // Adding the new item
+    // Create the new sidebar item dictionary
     // ============================================
     let newItemDict = NSMutableDictionary()
     
-    // CustomItemProperties (the user's Desktop must not take any properties, otherwise it won't show)
+    // Set custom properties (Desktop items need special handling)
+    // Desktop must not have CustomItemProperties or it won't display correctly
     if !addDirURL.lastPathComponent.contains("Desktop") {
         let customProperties = NSMutableDictionary()
         customProperties.setValue(NSNumber(value: 1), forKey: "com.apple.LSSharedFileList.ItemIsHidden") // 0=true, 1=false
         customProperties.setValue(NSNumber(value: 0), forKey: "com.apple.finder.dontshowonreappearance") // 0=true, 1=false
         
-        
         newItemDict.setObject(customProperties, forKey: "CustomItemProperties" as NSString)
     }
-    // UUID
+    
+    // Generate a unique identifier for the item
     let uuid = UUID().uuidString
     newItemDict.setValue(uuid, forKey: "uuid")
     
-    // Visibility
+    // Set visibility (0 = visible)
     newItemDict.setValue(NSNumber(value: 0), forKey: "visibility")
     
-    // Bookmark
+    // Create and store the bookmark data (persistent reference to the file/folder)
     if let bookmarkData = try? addDirURL.bookmarkData(options: .suitableForBookmarkFile, includingResourceValuesForKeys: nil, relativeTo: nil) {
         newItemDict.setObject(bookmarkData, forKey: "Bookmark" as NSString)
     } else {
@@ -317,11 +336,11 @@ func addItem(itemPath: String, to archiveDictM:NSMutableDictionary) throws {
         throw MyError.bookmarkError("Error: unable to create a bookmark for \(absoluteString)")
     }
     
-    // Addind the item to the array
+    // Add the new item to the items array
     itemsArrayM.add(newItemDict)
     print("Item \(addDirURL.lastPathComponent) successfuly added")
     
-    // Updating the main dictionary
+    // Update the main dictionary with the modified array
     archiveDictM.setObject(itemsArrayM, forKey: "items" as NSString)
 }
 
@@ -330,7 +349,7 @@ func reloadServices(force:Bool) {
     
     var forceReload = force
     
-    // Try to kill the sharedfilelistd process
+    // Attempt to kill the sharedfilelistd daemon (handles sidebar data)
     let killProcess = Process()
     killProcess.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
     killProcess.arguments = ["sharedfilelistd"]
@@ -339,13 +358,12 @@ func reloadServices(force:Bool) {
         try killProcess.run()
         killProcess.waitUntilExit()
     } catch {
-        //print("Unable to kill process")
-        // Killing the sharedfilelistd process failed, revert to killing the Finder
+        // If killing sharedfilelistd fails, fall back to restarting Finder
         forceReload = true
     }
     
+    // Force reload by restarting Finder (makes changes visible immediately)
     if forceReload {
-        // Reload the Finder
         let killFinder = Process()
         killFinder.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
         killFinder.arguments = ["Finder"]
@@ -357,16 +375,18 @@ func reloadServices(force:Bool) {
 
 func getSFL3path() throws -> URL {
     // ============================================
-    // Getting the path to the SFL3 file
+    // Construct the path to the SFL3 file
     // ============================================
     let fileManager = FileManager.default
     let fileName = "com.apple.LSSharedFileList.FavoriteItems.sfl3"
     
+    // Get the Application Support directory
     guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
         print("Error: unable to find the Application Support folder")
         throw MyError.inputOutputError("Error: unable to find the Application Support folder")
     }
     
+    // Build the full path: ~/Library/Application Support/com.apple.sharedfilelist/
     let containerURL = appSupportURL.appendingPathComponent("com.apple.sharedfilelist", isDirectory: true)
     let sharedFileListURL = containerURL.appendingPathComponent(fileName, isDirectory: false)
     
@@ -375,14 +395,14 @@ func getSFL3path() throws -> URL {
 
 func openSFL3(sharedFileListURL:URL) throws -> NSMutableDictionary {
     // ============================================
-    // Reading and unarchiving the SFL3 file
+    // Read and deserialize the SFL3 file
     // ============================================
     guard let plistData = try? Data(contentsOf: sharedFileListURL) else {
         print("Error: unable to read the SFL3 file. Make sure you have provided the necessary access rights to sbedit.")
         throw MyError.inputOutputError("Error: unable to read the SFL3 file.")
     }
     
-    // Authorized classes for Unarchiving
+    // Define allowed classes for secure unarchiving (NSKeyedUnarchiver requirement)
     let allowedClasses: [AnyClass] = [
         NSDictionary.self,
         NSMutableDictionary.self,
@@ -397,6 +417,7 @@ func openSFL3(sharedFileListURL:URL) throws -> NSMutableDictionary {
         NSDate.self
     ]
     
+    // Unarchive the keyed archive data into a dictionary
     var archivedDict:NSDictionary
     do {
         archivedDict = try NSKeyedUnarchiver.unarchivedObject(ofClasses: allowedClasses, from: plistData) as! NSDictionary
@@ -405,6 +426,7 @@ func openSFL3(sharedFileListURL:URL) throws -> NSMutableDictionary {
         throw error
     }
     
+    // Convert to mutable dictionary for modifications
     let archiveDictM = NSMutableDictionary(dictionary: archivedDict)
     
     return archiveDictM
@@ -412,13 +434,14 @@ func openSFL3(sharedFileListURL:URL) throws -> NSMutableDictionary {
 
 func saveSFL3(file sharedFileListURL:URL, archiveDictM:NSMutableDictionary) throws {
     // ============================================
-    // Archiving and writing to disk
+    // Serialize and write the dictionary back to disk
     // ============================================
     guard let saveData = try? NSKeyedArchiver.archivedData(withRootObject: archiveDictM, requiringSecureCoding: false) else {
         print("Error: unable to archive data")
         throw MyError.inputOutputError("Error: unable to archive data")
     }
     
+    // Write the archived data to the SFL3 file
     do {
         try saveData.write(to: sharedFileListURL, options: [])
         print("Modifications sucessfuly saved.")
@@ -431,14 +454,19 @@ func saveSFL3(file sharedFileListURL:URL, archiveDictM:NSMutableDictionary) thro
 
 func createEmptySFL3(to file:URL) {
     print("Creating an empty SFL3 file")
+    
+    // Initialize an empty SFL3 structure
     let archiveDictM = NSMutableDictionary()
     
+    // Create empty items array (no sidebar items yet)
     let items = NSArray()
     archiveDictM.setObject(items, forKey: NSString("items"))
     
+    // Set properties for the sidebar (force template icons)
     let properties = NSDictionary(object: true, forKey: NSString("com.apple.LSSharedFileList.ForceTemplateIcons"))
     archiveDictM.setObject(properties, forKey: NSString("properties"))
     
+    // Save the empty file structure
     do {
         try saveSFL3(file: file, archiveDictM: archiveDictM)
     } catch {
@@ -446,5 +474,5 @@ func createEmptySFL3(to file:URL) {
     }
 }
 
-// Exécution du script
+// Entry point - execute the main function
 main()
