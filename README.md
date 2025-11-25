@@ -1,93 +1,81 @@
 # SIDEBAR-EDITOR
 
+`sbedit` is a command line tool which can list and manipulate the favorite items shown in the sidebar of the Finder windows
 
+## DISCLAIMER
 
-## Getting started
+I am not a professionaly trained developer. Everything I know about programming has been self taught. As such, the code provided here is definitely not up to the standards of nowadays programming. Any help cleaning the code would be very welcome.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## History
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+In the past, many MacAdmins had been using the tool [mysides](https://github.com/mosen/mysides) to manage the sidebar items. This tool has worked at least until macOS 13 Ventura, and some reports has seen it work on macOS 14 Sonoma. Most of the API used by mysides is deprecated.
 
-## Add your files
+Starting with macOS 14, the sidebar favorite items are stored in a .sfl3 file that mysides cannot handle.
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+A Python method exists: [FinderSidebarEditor](https://github.com/robperc/FinderSidebarEditor), but it uses the same deprected API through PyObjC. Why it still works is a mystery.
 
-```
-cd existing_repo
-git remote add origin https://git.devops.etat-ge.ch/gitlab/DEVELOPPEUR-PEDAGO/mac/sidebar-editor.git
-git branch -M main
-git push -uf origin main
-```
+However, this Python script, while still working, is quite slow.
 
-## Integrate with your tools
+This is why I wanted to find a way to manipulate the Finder sidebar with a compiled executable that uses modern APIs.
 
-- [ ] [Set up project integrations](https://git.devops.etat-ge.ch/gitlab/DEVELOPPEUR-PEDAGO/mac/sidebar-editor/-/settings/integrations)
+That said, the way `sbedit` manipulates the favorite items is by no means an official, Apple supported method. It could break at any time.
 
-## Collaborate with your team
+## Requirements
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+MacOS 15+. Untested with MacOS 14, but it should work.
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+Here is the usage you get when calling `sbedit` without any arguments :
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```
+  sbedit command [arguments]
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+    LIST OF POSSIBLE COMMANDS :
+         --add           add all the paths provided as arguments to the sidebar
+         --removeAll     remove all items from the sidebar
+         --remove        remove the item path provided as argument from the 
+                         sidebar
+         --list          display the list of paths currently in the sidebar
+         --reload        reloads the Finder sidebar. This command takes an 
+                         optional argument "--force". See discussion below.
+         --version       prints the version number
+         
+    RELOADING THE FINDER SIDEBAR
+    
+    Reloading the Finder Sidebar is done by restarting the sharedfilelistd 
+    daemon. However, the changes to the Finder sidebar can take up to a minute 
+    to be visible. To speed up the reloading process, you can provide the 
+    --force argument, which will kill and restart the Finder, thus making 
+    the changes immediately visible.
+```    
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### Adding items to the sidebar
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+the `--add` command will take as many paths as you want and add them all to the favorite items of the sidebar, in the order you have provided them. Path can use the `~` to target the user's home folder.
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Exemple : 
 
-## License
-For open source projects, say how it is licensed.
+```
+sbedit --add "~/Documents" "/Applications" "~/Download"
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+### Removing all items from the sidebar
+
+The `--removeAll` command will remove all items from the favorite items of the sidebar.
+
+### Removing a specific item from the sidebar
+
+The `--remove` command will take a path as argument, and remove it from the sidebar. As with the `--add` command, you can use the `~` to target the user's home folder. This command is currently limited and you cannot specify multiple items, and you cannot provide only the name of an item to remove it. This is on the TODO list.
+
+### Listing the items currently in the sidebar
+
+The `--list` option will list the paths to the items currently in the sidebar. Please note that this list might not reflect what is visually shown in a currently open Finder window, as the service might have to be restarted (see the `--reload` option below)
+
+### Reload the services to make the changes visible
+
+The `--reload` command will restart the `sharedfilelistd` process to force it to load the new settings. If you run sbedit at login, for example with a tool like [Outset](https://github.com/macadmins/outset) when now Finder window is open, this command might suffice. However, if Finder windows are already displayed on the screen, the change might take more than a minute to be taken into account. If you want to force and speedup the process, you can add the `--force` argument to that command. This will kill and reload the Finder, thus applying the new settings immediately. However, this comes at the cost of a "flicker" as the Finder quits and reloads.
+    
+## Credits
+
+This code was heavily inspired by an [Applescript by com.cocolog-nifty.quicktimer](https://quicktimer.cocolog-nifty.com/icefloe/2024/03/post-7f4cb0.html).
