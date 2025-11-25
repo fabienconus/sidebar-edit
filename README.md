@@ -4,7 +4,7 @@
 
 ## DISCLAIMER
 
-I am not a professionaly trained developer. Everything I know about programming has been self taught. As such, the code provided here is definitely not up to the standards of nowadays programming. Any help cleaning the code would be very welcome.
+I am not a professionally trained developer. Everything I know about programming has been self-taught. As such, the code provided here is definitely not up to the standards of nowadays programming. Any help cleaning the code would be very welcome.
 
 ## History
 
