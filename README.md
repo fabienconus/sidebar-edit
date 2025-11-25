@@ -10,7 +10,7 @@ I am not a professionally trained developer. Everything I know about programming
 
 In the past, many MacAdmins had been using the tool [mysides](https://github.com/mosen/mysides) to manage the sidebar items. This tool has worked at least until macOS 13 Ventura, and some reports has seen it work on macOS 14 Sonoma. Most of the API used by mysides is deprecated.
 
-Starting with macOS 14, the sidebar favorite items are stored in a .sfl3 file that mysides cannot handle.
+Starting with macOS 13, the sidebar favorite items are stored in a .sfl3 file (.sfl4, starting with macOS 26) that mysides cannot handle.
 
 A Python method exists: [FinderSidebarEditor](https://github.com/robperc/FinderSidebarEditor), but it uses the same deprected API through PyObjC. Why it still works is a mystery.
 
@@ -22,7 +22,9 @@ That said, the way `sbedit` manipulates the favorite items is by no means an off
 
 ## Requirements
 
-MacOS 15+. Untested with MacOS 14, but it should work.
+MacOS 13+. Tested on macOS 13, macOS 15 and macOS 26.
+
+`sbedit` might require to have 
 
 ## Usage
 
@@ -76,6 +78,11 @@ The `--list` option will list the paths to the items currently in the sidebar. P
 
 The `--reload` command will restart the `sharedfilelistd` process to force it to load the new settings. If you run sbedit at login, for example with a tool like [Outset](https://github.com/macadmins/outset) when now Finder window is open, this command might suffice. However, if Finder windows are already displayed on the screen, the change might take more than a minute to be taken into account. If you want to force and speedup the process, you can add the `--force` argument to that command. This will kill and reload the Finder, thus applying the new settings immediately. However, this comes at the cost of a "flicker" as the Finder quits and reloads.
     
+## Discussion and design choices
+
+When a new user logs on a computer, as long as no Finder window is opened, the `com.apple.LSSharedFileList.FavoriteItems.sfl3` (or .sfl4) file does not exist. When the first Finder window is opened, macOS creates that file and populates it with default items.
+I have decided that when trying to list, add, or remove items when the `com.apple.LSSharedFileList.FavoriteItems.sfl3` (or .sfl4) file does not exist, `sbedit` will create that file with an empty array of items.
+
 ## Credits
 
 This code was heavily inspired by an [Applescript by com.cocolog-nifty.quicktimer](https://quicktimer.cocolog-nifty.com/icefloe/2024/03/post-7f4cb0.html).
