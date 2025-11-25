@@ -28,17 +28,18 @@ func main() {
         logerror("Unable to get URL for the SFL3 file")
         exit(1)
     }
-    
-    // Create an empty SFL3 file if it doesn't exist
-    if !FileManager.default.fileExists(atPath: sharedFileListURL.path) {
-        createEmptySFL3(to: sharedFileListURL)
-    }
-        
+
     // First argument is always the path to the binary, drop it.
     let arguments = CommandLine.arguments.dropFirst()
     
     // Retrieve the command from the first argument
     let command = arguments.first
+    
+    // Create an empty SFL3 file if it doesn't exist, except when reloading
+    // or displaying version
+    if command != "--version" && command != "--reload" && !FileManager.default.fileExists(atPath: sharedFileListURL.path) {
+        createEmptySFL3(to: sharedFileListURL)
+    }
     
     // Route to appropriate handler based on the command
     switch command {
@@ -345,7 +346,7 @@ func addItem(itemPath: String, to archiveDictM:NSMutableDictionary) throws {
 }
 
 func reloadServices(force:Bool) {
-    print("Rechargement des services...")
+    print("Restarting services...")
     
     var forceReload = force
     
@@ -378,7 +379,13 @@ func getSFL3path() throws -> URL {
     // Construct the path to the SFL3 file
     // ============================================
     let fileManager = FileManager.default
-    let fileName = "com.apple.LSSharedFileList.FavoriteItems.sfl3"
+    var fileName:String
+    
+    if #available(macOS 26, *) {
+        fileName = "com.apple.LSSharedFileList.FavoriteItems.sfl4"
+    } else {
+        fileName = "com.apple.LSSharedFileList.FavoriteItems.sfl3"
+    }
     
     // Get the Application Support directory
     guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
