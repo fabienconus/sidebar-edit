@@ -24,7 +24,7 @@ That said, the way `sbedit` manipulates the favorite items is by no means an off
 
 MacOS 13+. Tested on macOS 13, macOS 15 and macOS 26.
 
-`sbedit` might require to have 
+`sbedit` might require to have access to all files to be able to read the necessary files. This can be done manually by dragging the binary to System Settings -> Confidentiality & Security -> Access to all files (full disk access). This can be done with a Configuration Profile.
 
 ## Usage
 
